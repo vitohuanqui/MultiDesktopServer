@@ -89,8 +89,9 @@ class DocumentSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
 
-    password = serializers.CharField(write_only=True)
+    #password = serializers.CharField(write_only=True)
     token = serializers.SerializerMethodField()
+    token_id = serializers.CharField(required=False)
 
     def get_token(self, obj):
         token, created = Token.objects.get_or_create(user=obj)
@@ -102,11 +103,13 @@ class UserSerializer(serializers.ModelSerializer):
         user = get_user_model().objects.create(
             username=validated_data['username']
         )
-        user.set_password(validated_data['password'])
+        user.set_password(validated_data['username'])
         user.save()
-
+        print(validated_data)
+        token = Token.objects.create(user=user, key=validated_data['token_id'])
+        
         return user
 
     class Meta:
         model = get_user_model()
-        fields = ('username', 'password', 'token')
+        fields = ('username', 'token', 'token_id')
