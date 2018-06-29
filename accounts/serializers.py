@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from rest_framework.settings import api_settings
 
-from accounts.models import Document
+from accounts.models import Document, UserIP
 
 
 class Base64ImageField(serializers.ImageField):
@@ -80,7 +80,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('file_b64', 'x', 'y', 'z')
+        fields = ('id', 'shared', 'file_b64', 'x', 'y', 'z')
 
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
@@ -99,17 +99,77 @@ class UserSerializer(serializers.ModelSerializer):
         return token.key
 
     def create(self, validated_data):
-
-        user = get_user_model().objects.create(
+        print("asdads")
+        user, created = get_user_model().objects.get_or_create(
             username=validated_data['username']
         )
-        user.set_password(validated_data['username'])
-        user.save()
-        print(validated_data)
+        if created:
+            user.set_password(validated_data['username'])
+            user.save()
         token = Token.objects.create(user=user, key=validated_data['token_id'])
         
+        return user
+
+    def update(self, instance, validated_data):
+        print(validated_data)
+        user, created = get_user_model().objects.get_or_create(
+            username=validated_data['username']
+        )
+        print(created)
+        if created:
+            print("CREO")
+
+            user.set_password(validated_data['username'])
+            user.save()
+            token = Token.objects.create(user=user, key=validated_data['token_id'])
+        else:
+            print("actualiza")
+            Token.objects.filter(user=user).delete()
+            Token.objects.create(user=user, key=validated_data['token_id'])
+
         return user
 
     class Meta:
         model = get_user_model()
         fields = ('username', 'token', 'token_id')
+
+
+class UserLeapSerializer(serializers.ModelSerializer):
+
+    ip = serializers.CharField(source='userip.ip')
+
+    def create(self, validated_data):
+        user, created = get_user_model().objects.get_or_create(
+            username=validated_data['username']
+        )
+        if created:
+            user.set_password(validated_data['username'])
+            user.save()
+            ip = UserIP.objects.create(user=user, ip=validated_data['userip']['ip'])
+        else:
+            user.userip.ip = validated_data['userip']['ip']
+            user.userip.save()
+
+        return user
+
+    def get_ip(self, obj):
+
+        return obj.userip.ip
+
+    class Meta:
+        model = get_user_model()
+        fields = ('username', 'ip')
+
+
+class UserDocumentShareSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Document
+        fields = ('shared', )
+
+
+class UpdateDocumentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Document
+        fields = ('x', 'y', 'z')
